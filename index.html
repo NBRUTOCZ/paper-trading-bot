@@ -1,0 +1,218 @@
+<!doctype html>
+<html lang="hu">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <meta name="theme-color" content="#0b1020" />
+  <meta name="description" content="Élő árfolyamot használó, kizárólag szimulált automata kereskedési dashboard." />
+  <title>Norbi Paper Trading Bot</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <header class="topbar">
+    <div>
+      <p class="eyebrow">ÉLŐ PIACI ADAT • SZIMULÁLT KERESKEDÉS</p>
+      <h1>Norbi Paper Trading Bot</h1>
+      <p class="subtitle">Automatikus EMA-stratégia, virtuális egyenleggel és valós idejű eredménykimutatással.</p>
+    </div>
+    <div class="connection-card">
+      <span id="connectionDot" class="dot offline"></span>
+      <div>
+        <strong id="connectionText">Nincs kapcsolat</strong>
+        <small id="lastUpdate">Még nincs adat</small>
+      </div>
+    </div>
+  </header>
+
+  <main class="page-shell">
+    <section class="panel controls-panel">
+      <div class="panel-heading">
+        <div>
+          <p class="section-label">BEÁLLÍTÁSOK</p>
+          <h2>Szimuláció indítása</h2>
+        </div>
+        <span class="paper-badge">PAPER ONLY</span>
+      </div>
+
+      <div class="form-grid">
+        <label>
+          Kezdőtőke (USDT)
+          <input id="startingBalance" type="number" min="100" step="100" value="25000" />
+        </label>
+        <label>
+          Piac
+          <select id="symbol">
+            <option value="BTCUSDT">BTCUSDT Perpetual</option>
+            <option value="ETHUSDT">ETHUSDT Perpetual</option>
+            <option value="SOLUSDT">SOLUSDT Perpetual</option>
+            <option value="BNBUSDT">BNBUSDT Perpetual</option>
+          </select>
+        </label>
+        <label>
+          Pozícióméret (% egyenleg)
+          <input id="positionPercent" type="number" min="1" max="100" step="1" value="20" />
+        </label>
+        <label>
+          Gyors EMA
+          <input id="fastEma" type="number" min="2" max="100" step="1" value="9" />
+        </label>
+        <label>
+          Lassú EMA
+          <input id="slowEma" type="number" min="3" max="300" step="1" value="21" />
+        </label>
+        <label>
+          Stop-loss (%)
+          <input id="stopLoss" type="number" min="0.1" max="20" step="0.1" value="0.6" />
+        </label>
+        <label>
+          Take-profit (%)
+          <input id="takeProfit" type="number" min="0.1" max="50" step="0.1" value="1.2" />
+        </label>
+        <label>
+          Díj oldalanként (%)
+          <input id="feeRate" type="number" min="0" max="1" step="0.001" value="0.04" />
+        </label>
+      </div>
+
+      <div class="button-row">
+        <button id="startButton" class="button primary">Szimuláció indítása</button>
+        <button id="pauseButton" class="button secondary" disabled>Szünet</button>
+        <button id="closeButton" class="button secondary" disabled>Pozíció zárása</button>
+        <button id="resetButton" class="button danger">Nullázás</button>
+      </div>
+      <p class="warning-text">Ez az oldal nem küld valódi megbízást, nem kér API-kulcsot, és nem kezel valódi pénzt.</p>
+    </section>
+
+    <section class="stats-grid">
+      <article class="stat-card accent">
+        <span>Élő ár</span>
+        <strong id="livePrice">—</strong>
+        <small id="priceChange">1 perces gyertyák</small>
+      </article>
+      <article class="stat-card">
+        <span>Egyenleg</span>
+        <strong id="balance">—</strong>
+        <small>Realizált eredménnyel</small>
+      </article>
+      <article class="stat-card">
+        <span>Saját tőke</span>
+        <strong id="equity">—</strong>
+        <small>Nyitott P&amp;L-lel együtt</small>
+      </article>
+      <article class="stat-card">
+        <span>Összes P&amp;L</span>
+        <strong id="totalPnl">—</strong>
+        <small id="totalPnlPercent">—</small>
+      </article>
+      <article class="stat-card">
+        <span>Nyitott P&amp;L</span>
+        <strong id="unrealizedPnl">—</strong>
+        <small id="positionSideLabel">Nincs pozíció</small>
+      </article>
+      <article class="stat-card">
+        <span>Max. drawdown</span>
+        <strong id="maxDrawdown">—</strong>
+        <small id="maxDrawdownPercent">—</small>
+      </article>
+    </section>
+
+    <section class="content-grid">
+      <article class="panel chart-panel">
+        <div class="panel-heading compact">
+          <div>
+            <p class="section-label">PIAC</p>
+            <h2 id="chartTitle">BTCUSDT • 1 perc</h2>
+          </div>
+          <div class="legend">
+            <span><i class="legend-price"></i> Ár</span>
+            <span><i class="legend-fast"></i> Gyors EMA</span>
+            <span><i class="legend-slow"></i> Lassú EMA</span>
+          </div>
+        </div>
+        <div class="canvas-wrap">
+          <canvas id="priceChart" aria-label="Árfolyamgrafikon"></canvas>
+          <div id="chartEmpty" class="chart-empty">Az élő adatok betöltése folyamatban…</div>
+        </div>
+      </article>
+
+      <article class="panel position-panel">
+        <div class="panel-heading compact">
+          <div>
+            <p class="section-label">AKTUÁLIS POZÍCIÓ</p>
+            <h2 id="positionStatus">Nincs nyitott pozíció</h2>
+          </div>
+          <span id="positionBadge" class="position-badge neutral">FLAT</span>
+        </div>
+        <dl class="position-list">
+          <div><dt>Belépési ár</dt><dd id="entryPrice">—</dd></div>
+          <div><dt>Mennyiség</dt><dd id="quantity">—</dd></div>
+          <div><dt>Pozícióérték</dt><dd id="positionValue">—</dd></div>
+          <div><dt>Stop-loss</dt><dd id="stopPrice">—</dd></div>
+          <div><dt>Take-profit</dt><dd id="targetPrice">—</dd></div>
+          <div><dt>Nyitás ideje</dt><dd id="openedAt">—</dd></div>
+        </dl>
+        <div class="signal-box">
+          <span>Bot állapota</span>
+          <strong id="botStatus">Leállítva</strong>
+          <small id="signalReason">Indítsd el a szimulációt.</small>
+        </div>
+      </article>
+    </section>
+
+    <section class="content-grid lower-grid">
+      <article class="panel">
+        <div class="panel-heading compact">
+          <div>
+            <p class="section-label">EREDMÉNYEK</p>
+            <h2>Teljesítmény</h2>
+          </div>
+        </div>
+        <div class="performance-grid">
+          <div><span>Kötések</span><strong id="tradeCount">0</strong></div>
+          <div><span>Nyerők</span><strong id="wins">0</strong></div>
+          <div><span>Veszítők</span><strong id="losses">0</strong></div>
+          <div><span>Találati arány</span><strong id="winRate">0%</strong></div>
+          <div><span>Bruttó profit</span><strong id="grossProfit">0 USDT</strong></div>
+          <div><span>Bruttó veszteség</span><strong id="grossLoss">0 USDT</strong></div>
+        </div>
+        <div class="canvas-wrap equity-wrap">
+          <canvas id="equityChart" aria-label="Saját tőke grafikon"></canvas>
+        </div>
+      </article>
+
+      <article class="panel log-panel">
+        <div class="panel-heading compact">
+          <div>
+            <p class="section-label">NAPLÓ</p>
+            <h2>Kötések</h2>
+          </div>
+          <button id="exportButton" class="text-button">CSV export</button>
+        </div>
+        <div class="table-wrap">
+          <table>
+            <thead>
+              <tr>
+                <th>Idő</th>
+                <th>Irány</th>
+                <th>Belépő</th>
+                <th>Kilépő</th>
+                <th>P&amp;L</th>
+                <th>Ok</th>
+              </tr>
+            </thead>
+            <tbody id="tradeTableBody">
+              <tr class="empty-row"><td colspan="6">Még nincs lezárt kötés.</td></tr>
+            </tbody>
+          </table>
+        </div>
+      </article>
+    </section>
+  </main>
+
+  <footer>
+    <p>Oktatási célú paper-trading projekt. A múltbeli vagy szimulált eredmény nem garantál jövőbeli nyereséget.</p>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
